@@ -71,7 +71,7 @@ jobs:
           armbian_runner_clean: "yes"
 
       - name: Upload image
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: Armbian-${{ env.BOARD }}-${{ github.event.inputs.release || env.RELEASE }}-${{ github.event.inputs.branch || env.BRANCH }}
           path: build/output/images/*.img
