@@ -1,0 +1,123 @@
+name: Build Armbian for Longan H618
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'config/**'
+      - 'patch/**'
+      - '.github/workflows/build.yml'
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+    inputs:
+      release:
+        description: 'Target release (noble, bookworm, trixie)'
+        required: false
+        default: 'noble'
+        type: choice
+        options:
+          - noble
+          - bookworm
+          - trixie
+      desktop:
+        description: 'Build desktop image'
+        required: false
+        default: false
+        type: boolean
+      branch:
+        description: 'Kernel branch'
+        required: false
+        default: 'current'
+        type: choice
+        options:
+          - current
+          - edge
+
+env:
+  BOARD: longan-h618
+  BRANCH: current
+  RELEASE: noble
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Free disk space
+        uses: jlumbroso/free-disk-space@main
+        with:
+          tool-cache: false
+          android: true
+          dotnet: true
+          haskell: true
+          large-packages: true
+          docker-images: true
+          swap-storage: true
+
+      - name: Build Armbian
+        uses: armbian/build@main
+        with:
+          armbian_token: ${{ secrets.GITHUB_TOKEN }}
+          armbian_board: ${{ env.BOARD }}
+          armbian_branch: ${{ github.event.inputs.branch || env.BRANCH }}
+          armbian_release: ${{ github.event.inputs.release || env.RELEASE }}
+          armbian_target: build
+          armbian_ui: ${{ github.event.inputs.desktop == 'true' && 'xfce' || 'minimal' }}
+          armbian_runner_clean: "yes"
+
+      - name: Upload image
+        uses: actions/upload-artifact@v4
+        with:
+          name: Armbian-${{ env.BOARD }}-${{ github.event.inputs.release || env.RELEASE }}-${{ github.event.inputs.branch || env.BRANCH }}
+          path: build/output/images/*.img
+          retention-days: 7
+
+  release:
+    needs: build
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ github.run_number }}
+          name: Armbian Longan H618 Build ${{ github.run_number }}
+          body: |
+            ## Armbian for Longan H618
+
+            ### Changes
+            - Built from commit ${{ github.sha }}
+            - Kernel: Linux 6.18.x (sunxi64)
+            - Board: longan-h618
+
+            ### Hardware Support
+            - ST7789V SPI display
+            - GMAC1 Ethernet (RMII)
+            - PCF8563 RTC
+            - WiFi/BT (UWE5622)
+            - HDMI output
+            - USB 2.0/3.0
+
+            ### Flash
+            ```bash
+            sudo dd if=*.img of=/dev/sdX bs=1M status=progress
+            ```
+          files: artifacts/**/*.img
+          draft: false
+          prerelease: false

@@ -1,0 +1,371 @@
+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+/*
+ * Copyright (C) 2020 frank@allwinnertech.com
+ * Copyright (c) 2024 Longan <longan@allwinnertech.com>
+ *
+ * Longan H618 (p1) board device tree for Armbian mainline kernel
+ * Based on longan-h618 p1 vendor DTS, translated to mainline bindings
+ */
+
+/dts-v1/;
+
+#include "sun50i-h616.dtsi"
+#include "sun50i-h616-cpu-opp.dtsi"
+
+#include <dt-bindings/gpio/gpio.h>
+#include <dt-bindings/interrupt-controller/arm-gic.h>
+#include <dt-bindings/leds/common.h>
+
+/ {
+	model = "Longan H618";
+	compatible = "longan,h618", "allwinner,sun50i-h618";
+
+	aliases {
+		ethernet0 = &emac1;
+		serial0 = &uart0;
+		serial1 = &uart1;
+		serial2 = &uart2;
+		serial3 = &uart3;
+		serial4 = &uart4;
+		i2c1 = &i2c1;
+	};
+
+	chosen {
+		stdout-path = "serial0:115200n8";
+	};
+
+	connector {
+		compatible = "hdmi-connector";
+		type = "d";
+
+		port {
+			hdmi_con_in: endpoint {
+				remote-endpoint = <&hdmi_out_con>;
+			};
+		};
+	};
+
+	leds {
+		compatible = "gpio-leds";
+
+		led-heart {
+			color = <LED_COLOR_ID_GREEN>;
+			function = LED_FUNCTION_HEARTBEAT;
+			gpios = <&pio 6 13 GPIO_ACTIVE_HIGH>; /* PG13 */
+			linux,default-trigger = "heartbeat";
+		};
+
+		led-watchdog {
+			color = <LED_COLOR_ID_BLUE>;
+			function = LED_FUNCTION_INDICATOR;
+			gpios = <&pio 6 14 GPIO_ACTIVE_HIGH>; /* PG14 */
+			linux,default-trigger = "heartbeat";
+		};
+	};
+
+	reg_vcc5v: regulator-vcc5v {
+		compatible = "regulator-fixed";
+		regulator-always-on;
+		regulator-min-microvolt = <5000000>;
+		regulator-max-microvolt = <5000000>;
+		regulator-name = "vcc-5v";
+	};
+
+	reg_usb_vbus: regulator-usb-vbus {
+		compatible = "regulator-fixed";
+		regulator-min-microvolt = <5000000>;
+		regulator-max-microvolt = <5000000>;
+		regulator-name = "usb-vbus";
+		vin-supply = <&reg_vcc5v>;
+		gpio = <&pio 7 8 GPIO_ACTIVE_HIGH>; /* PH8 */
+		enable-active-high;
+		regulator-always-on;
+	};
+
+	sdio_pwrseq: sdio-pwrseq {
+		compatible = "mmc-pwrseq-simple";
+		clocks = <&rtc CLK_OSC32K_FANOUT>;
+		clock-names = "ext_clock";
+		pinctrl-0 = <&x32clk_fanout_pin>;
+		pinctrl-names = "default";
+		post-power-on-delay-ms = <100>;
+		power-off-delay-us = <5000000>;
+		reset-gpios = <&pio 6 18 GPIO_ACTIVE_LOW>, /* PG18 */
+			      <&pio 6 19 GPIO_ACTIVE_LOW>; /* PG19 */
+	};
+};
+
+/* CPU power supply from AXP1530 PMIC */
+&cpu0 {
+	cpu-supply = <&reg_dcdc2>;
+};
+
+/* Display Engine */
+&de {
+	status = "okay";
+};
+
+/* GMAC1 Ethernet (RMII) - PA0-PA9 */
+&emac1 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&rmii_pins>;
+	phy-mode = "rmii";
+	phy-handle = <&rmii_phy>;
+	phy-supply = <&reg_dldo1>;
+	allwinner,rx-delay-ps = <3100>;
+	allwinner,tx-delay-ps = <700>;
+	status = "okay";
+};
+
+&mdio1 {
+	rmii_phy: ethernet-phy@1 {
+		compatible = "ethernet-phy-ieee802.3-c22";
+		reg = <1>;
+	};
+};
+
+/* USB Host Controllers */
+&ehci0 {
+	status = "okay";
+};
+
+&ehci1 {
+	status = "okay";
+};
+
+&ehci2 {
+	status = "okay";
+};
+
+&ehci3 {
+	status = "okay";
+};
+
+/* GPU */
+&gpu {
+	status = "okay";
+	mali-supply = <&reg_dcdc1>;
+};
+
+/* HDMI */
+&hdmi {
+	status = "okay";
+};
+
+&hdmi_out {
+	hdmi_out_con: endpoint {
+		remote-endpoint = <&hdmi_con_in>;
+	};
+};
+
+/* I2C1 - PCF8563 RTC (PI5, PI6) */
+&i2c1 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&i2c1_pins>;
+	status = "okay";
+
+	pcf8563: rtc@51 {
+		compatible = "nxp,pcf8563";
+		reg = <0x51>;
+		#clock-cells = <0>;
+		status = "okay";
+	};
+};
+
+/* IR receiver (PH10) */
+&ir {
+	pinctrl-names = "default";
+	pinctrl-0 = <&ir_rx_pin>;
+	status = "okay";
+};
+
+/* SD card on MMC0 */
+&mmc0 {
+	status = "okay";
+	bus-width = <4>;
+	cd-gpios = <&pio 5 6 GPIO_ACTIVE_HIGH>; /* PF6 */
+	cd-inverted;
+	disable-wp;
+	max-frequency = <50000000>;
+	vmmc-supply = <&reg_dldo1>;
+};
+
+/* SDIO WiFi on MMC1 */
+&mmc1 {
+	status = "okay";
+	bus-width = <4>;
+	keep-power-in-suspend;
+	max-frequency = <100000000>;
+	mmc-pwrseq = <&sdio_pwrseq>;
+	no-mmc;
+	no-sd;
+	non-removable;
+	vmmc-supply = <&reg_dldo1>;
+	vqmmc-supply = <&reg_aldo1>;
+
+	sdio: wifi@1 {
+		reg = <1>;
+	};
+};
+
+/* eMMC on MMC2 */
+&mmc2 {
+	status = "okay";
+	bus-width = <8>;
+	cap-mmc-hw-reset;
+	mmc-hs200-1_8v;
+	non-removable;
+	vmmc-supply = <&reg_dldo1>;
+	vqmmc-supply = <&reg_aldo1>;
+};
+
+/* OHCI USB Host Controllers */
+&ohci0 {
+	status = "okay";
+};
+
+&ohci1 {
+	status = "okay";
+};
+
+&ohci2 {
+	status = "okay";
+};
+
+&ohci3 {
+	status = "okay";
+};
+
+/* Pin control */
+&pio {
+	vcc-pc-supply = <&reg_dldo1>;
+	vcc-pf-supply = <&reg_dldo1>;
+	vcc-pg-supply = <&reg_aldo1>;
+	vcc-ph-supply = <&reg_dldo1>;
+	vcc-pi-supply = <&reg_dldo1>;
+	vcc-pl-supply = <&reg_aldo1>;
+
+	/* I2C1 pins (PI5, PI6) */
+	i2c1_pins: i2c1-pins {
+		pins = "PI5", "PI6";
+		function = "i2c1";
+	};
+};
+
+/* PWM1 (PI11) */
+&pwm1 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&pwm1_pin>;
+	status = "okay";
+};
+
+/* PWM2 (PI12) */
+&pwm2 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&pwm2_pin>;
+	status = "okay";
+};
+
+/* PWM5 (PA12) */
+&pwm5 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&pwm5_pin>;
+	status = "okay";
+};
+
+/* SPI1 - ST7789V display */
+&spi1 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&spi1_pins>, <&spi1_cs0_pin>;
+	status = "okay";
+
+	st7789v@0 {
+		compatible = "sitronix,st7789";
+		reg = <0>;
+		spi-max-frequency = <10000000>;
+		spi-cpol;
+		spi-cpha;
+		rotate = <90>;
+		fps = <30>;
+		buswidth = <8>;
+		width = <170>;
+		height = <320>;
+		reset-gpios = <&pio 7 8 GPIO_ACTIVE_LOW>;  /* PH8 */
+		dc-gpios = <&pio 7 4 GPIO_ACTIVE_HIGH>;    /* PH4 */
+		led-gpios = <&pio 7 9 GPIO_ACTIVE_LOW>;    /* PH9 */
+		backlight = <1>;
+		status = "okay";
+	};
+};
+
+/* SPI1 pins (PH5, PH6, PH7) */
+&pio {
+	spi1_pins: spi1-pins {
+		pins = "PH6", "PH7";
+		function = "spi1";
+	};
+
+	spi1_cs0_pin: spi1-cs0-pin {
+		pins = "PH5";
+		function = "spi1";
+	};
+};
+
+/* UART0 - debug console (PH0, PH1) */
+&uart0 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&uart0_ph_pins>;
+	status = "okay";
+};
+
+/* UART1 - Bluetooth (PG6-PG9) */
+&uart1 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&uart1_pins>;
+	status = "okay";
+};
+
+/* UART2 (PI5, PI6) */
+&uart2 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&uart2_pins>;
+	status = "okay";
+};
+
+/* UART3 (PI9, PI10) */
+&uart3 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&uart3_pins>;
+	status = "okay";
+};
+
+/* UART4 (PI13, PI14) */
+&uart4 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&uart4_pins>;
+	status = "okay";
+};
+
+/* Audio codec */
+&codec {
+	status = "okay";
+	allwinner,audio-routing = "Line Out", "LINEOUT";
+};
+
+/* USB OTG */
+&usbotg {
+	status = "okay";
+	dr_mode = "otg";
+};
+
+/* USB PHY */
+&usbphy {
+	usb0_vbus-supply = <&reg_usb_vbus>;
+	usb1_vbus-supply = <&reg_usb_vbus>;
+	status = "okay";
+};
+
+/* WiFi power sequence */
+&wifi_pwrseq {
+	status = "okay";
+};

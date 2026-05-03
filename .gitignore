@@ -1,0 +1,41 @@
+# ===== Armbian Build =====
+# Build output
+output/
+debs-cache/
+
+# Cache and temp
+.cache/
+.tmp/
+*.tmp
+*.bak
+
+# ===== IDE =====
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# ===== OS =====
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# ===== Logs =====
+*.log
+*.log.ans
+*.log.raw.tar
+
+# ===== User patches (empty dirs needed) =====
+# userpatches/ is tracked but contents below are ignored
+userpatches/*.deb
+userpatches/*.img
+userpatches/*.xz
+userpatches/*.tar
+
+# ===== Keep these directories =====
+# These dirs must exist even if empty
+!.gitkeep
+!config/
+!patch/
+!userpatches/
