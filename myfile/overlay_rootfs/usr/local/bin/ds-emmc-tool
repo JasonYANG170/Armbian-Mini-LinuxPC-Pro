@@ -1,0 +1,106 @@
+#!/bin/bash
+
+EMMC_DEV="/dev/mmcblk2"
+BACKUP_DIR="/root/emmc-bk"
+
+# 检查依赖
+for cmd in pv dialog dd blockdev gzip gunzip; do
+  if ! command -v $cmd &>/dev/null; then
+    echo "请先安装 $cmd"
+    exit 1
+  fi
+done
+
+# 检查 root 权限
+if [ "$EUID" -ne 0 ]; then
+  echo "请以 root 权限运行此脚本"
+  exit 1
+fi
+
+mkdir -p "$BACKUP_DIR"
+
+function unmount_emmc() {
+  for part in $(ls ${EMMC_DEV}p* 2>/dev/null); do
+    umount "$part" 2>/dev/null
+  done
+}
+
+function backup_emmc() {
+  TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+
+  dialog --defaultno --title "是否启用压缩" --yesno "是否将备份压缩为 .gz 文件？\n\n⚠️ 注意：压缩过程会显著拖慢备份速度，尤其在性能较弱的设备上。" 10 60
+  COMPRESS=$?
+
+  if [ "$COMPRESS" -eq 0 ]; then
+    BACKUP_PATH="$BACKUP_DIR/emmc_backup_$TIMESTAMP.img.gz"
+  else
+    BACKUP_PATH="$BACKUP_DIR/emmc_backup_$TIMESTAMP.img"
+  fi
+
+  dialog --title "确认备份" --yesno "将设备 $EMMC_DEV 备份为：\n$BACKUP_PATH\n\n继续吗？" 10 60
+  [ $? -ne 0 ] && echo "取消操作" && return
+
+  SIZE_BYTES=$(blockdev --getsize64 "$EMMC_DEV")
+  echo "开始备份..."
+
+  if [ "$COMPRESS" -eq 0 ]; then
+    dd if="$EMMC_DEV" bs=4M status=none | pv -s $SIZE_BYTES | gzip > "$BACKUP_PATH"
+  else
+    dd if="$EMMC_DEV" bs=4M status=none | pv -s $SIZE_BYTES > "$BACKUP_PATH"
+  fi
+
+  sync
+  dialog --title "完成" --msgbox "备份完成！\n文件路径：\n$BACKUP_PATH" 8 60
+}
+
+function restore_emmc() {
+  IMAGES=($(ls "$BACKUP_DIR"/*.img* 2>/dev/null))
+  if [ ${#IMAGES[@]} -eq 0 ]; then
+    dialog --title "错误" --msgbox "目录 $BACKUP_DIR 中无任何 .img 或 .img.gz 文件，无法还原。" 7 60
+    return
+  fi
+
+  MENU_ITEMS=()
+  for i in "${!IMAGES[@]}"; do
+    MENU_ITEMS+=($i "$(basename "${IMAGES[$i]}")")
+  done
+
+  CHOICE=$(dialog --title "选择镜像文件" --menu "请选择要还原的镜像文件：" 15 60 6 "${MENU_ITEMS[@]}" 3>&1 1>&2 2>&3)
+  clear
+  [ -z "$CHOICE" ] && echo "取消操作" && return
+
+  IMG_FILE="${IMAGES[$CHOICE]}"
+
+  dialog --title "确认还原" --yesno "将镜像文件：\n$IMG_FILE\n写入设备 $EMMC_DEV\n\n此操作将清除原有数据。\n继续吗？" 12 60
+  [ $? -ne 0 ] && echo "取消操作" && return
+
+  unmount_emmc
+
+  echo "开始还原..."
+  if [[ "$IMG_FILE" == *.gz ]]; then
+    SIZE_BYTES=$(gzip -l "$IMG_FILE" | awk 'NR==2 {print $2}')
+    gunzip -c "$IMG_FILE" | pv -s $SIZE_BYTES | dd of="$EMMC_DEV" bs=4M status=none
+  else
+    SIZE_BYTES=$(stat -c%s "$IMG_FILE")
+    pv -s $SIZE_BYTES "$IMG_FILE" | dd of="$EMMC_DEV" bs=4M status=none
+  fi
+
+  sync
+  dialog --title "完成" --msgbox "还原完成！\n已写入镜像文件：\n$IMG_FILE" 8 60
+}
+
+while true; do
+  CHOICE=$(dialog --title "eMMC 备份与还原工具" --menu "请选择操作：" 12 60 4 \
+    1 "备份 eMMC（默认不压缩）" \
+    2 "还原 eMMC（支持 .img/.img.gz）" \
+    3 "退出" \
+    3>&1 1>&2 2>&3)
+  clear
+  case $CHOICE in
+    1) backup_emmc ;;
+    2) restore_emmc ;;
+    3) exit 0 ;;
+    *) break ;;
+  esac
+done
+
