@@ -1,0 +1,364 @@
+#!/bin/bash
+#
+# Copyright (c) Authors: https://www.armbian.com/authors
+#
+# This file is licensed under the terms of the GNU General Public
+# License version 2. This program is licensed "as is" without any
+# warranty of any kind, whether express or implied.
+
+# 预设自动配置参数
+PRESET_ROOT_PASSWORD="root"
+PRESET_USER_NAME="dsdz"
+PRESET_USER_PASSWORD="dsdz"
+PRESET_DEFAULT_REALNAME="dsdz User"
+PRESET_TIMEZONE="Asia/Shanghai"
+PRESET_LOCALE="en_US.UTF-8"
+PRESET_USER_SHELL="bash"
+PRESET_NET_CHANGE_DEFAULTS=0  # 不修改网络设置
+PRESET_CONNECT_WIRELESS="N"   # 跳过无线设置
+SET_LANG_BASED_ON_LOCATION="N" # 不基于位置设置语言
+
+# read distribution status
+# shellcheck source=/dev/null
+[[ -f /etc/lsb-release ]] && . /etc/lsb-release
+[[ -f /etc/os-release ]] && . /etc/os-release
+[[ -z "$DISTRIB_CODENAME" ]] && DISTRIB_CODENAME="${VERSION_CODENAME}"
+[[ -n "$DISTRIB_CODENAME" && -f /etc/armbian-distribution-status ]] && DISTRIBUTION_STATUS=$(grep "$DISTRIB_CODENAME" /etc/armbian-distribution-status | cut -d"=" -f2)
+
+. /etc/armbian-release
+
+check_abort() {
+    echo -e "\nDisabling user account creation procedure\n"
+    #rm -f /root/.not_logged_in_yet
+    if [[ ${USER_SHELL} == zsh ]]; then
+        printf "\nYou selected \e[0;91mZSH\x1B[0m as your default shell. If you want to use it right away, please logout and login! \n\n"
+    fi
+    trap - INT
+    exit 0
+}
+
+mask2cidr() {
+    nbits=0
+    IFS=.
+    for dec in $1 ; do
+        case $dec in
+            255) let nbits+=8;;
+            254) let nbits+=7;;
+            252) let nbits+=6;;
+            248) let nbits+=5;;
+            240) let nbits+=4;;
+            224) let nbits+=3;;
+            192) let nbits+=2;;
+            128) let nbits+=1;;
+            0);;
+            *) echo "Error: $dec is not recognised"; exit 1
+        esac
+    done
+    echo "$nbits"
+}
+
+createYAML() {
+   local YAML="network:\n"
+    YAML+="  $DEVTYPE:\n"
+    YAML+="    $DEVICE_NAME:\n"
+    if [[ "${PRESET_NET_USE_STATIC}" == 0 ]]; then      YAML+="      dhcp4: yes\n";fi
+    if [[ "${PRESET_NET_USE_STATIC}" == 0 ]]; then      YAML+="      dhcp6: yes\n";fi
+    if [[ "${PRESET_NET_USE_STATIC}" == 1 ]]; then
+        YAML+="      addresses:\n"
+        YAML+="        - $PRESET_NET_STATIC_IP/$PRESET_NET_STATIC_MASK\n"
+        if [[ -n "${PRESET_NET_STATIC_GATEWAY}" ]]; then   YAML+="      routes:\n";fi
+        if [[ -n "${PRESET_NET_STATIC_GATEWAY}" ]]; then   YAML+="        - to: default\n";fi
+        if [[ -n "${PRESET_NET_STATIC_GATEWAY}" ]]; then   YAML+="          via: ${PRESET_NET_STATIC_GATEWAY}\n";fi
+        if [[ -n "${PRESET_NET_STATIC_DNS}" ]]; then       YAML+="      nameservers:\n"; fi
+        if [[ -n "${PRESET_NET_STATIC_DNS}" ]]; then       YAML+="        addresses: [$PRESET_NET_STATIC_DNS]\n"; fi
+    fi
+    if [[ "${PRESET_NET_WIFI_ENABLED}" == 1 ]]; then
+        if [[ -n "${PRESET_NET_WIFI_COUNTRYCODE}" ]]; then YAML+="      regulatory-domain: $PRESET_NET_WIFI_COUNTRYCODE\n"; fi
+        if [[ -n "${PRESET_NET_WIFI_SSID}" ]]; then        YAML+="      access-points:\n"; fi
+        if [[ -n "${PRESET_NET_WIFI_SSID}" ]]; then        YAML+="        \"$PRESET_NET_WIFI_SSID\":\n"; fi
+        if [[ -n "${PRESET_NET_WIFI_KEY}" ]]; then         YAML+="          password: \"$PRESET_NET_WIFI_KEY\"\n" ; fi
+    fi
+    printf "%s" "$YAML"
+}
+
+do_firstrun_automated_network_configuration() {
+    # Skip network configuration as per preset
+    if [[ $PRESET_NET_CHANGE_DEFAULTS == 0 ]]; then
+        return
+    fi
+
+    # Rest of original network configuration code...
+    # [保留原有网络配置代码，但不会执行因为PRESET_NET_CHANGE_DEFAULTS=0]
+}
+
+get_local_ip_addr() {
+    local_device_ip=$(ip -4 addr show scope global | grep inet | awk '{print $2}' | cut -d/ -f1 | awk '{$1=$1}1' FS='\n' OFS=',' RS=)
+    echo -e "\e[1A\e[KIP address: \x1B[92m${local_device_ip}\x1B[0m"
+}
+
+read_password() {
+    # 自动返回预设密码
+    if [[ "$1" == "Create root" ]]; then
+        password="$PRESET_ROOT_PASSWORD"
+    elif [[ "$1" == *"$PRESET_USER_NAME"* ]]; then
+        password="$PRESET_USER_PASSWORD"
+    fi
+}
+
+set_shell() {
+    USER_SHELL="$PRESET_USER_SHELL"
+    SHELL_PATH=$(grep "/$USER_SHELL$" /etc/shells | tail -1)
+    chsh -s "$SHELL_PATH"
+    
+    # change shell for future users
+    sed -i "s|^SHELL=.*|SHELL=${SHELL_PATH}|" /etc/default/useradd
+    sed -i "s|^DSHELL=.*|DSHELL=${SHELL_PATH}|" /etc/adduser.conf
+    
+    echo -e "\nShell: \x1B[92m${USER_SHELL^^}\x1B[0m"
+}
+
+set_timezone_and_locales() {
+    # 直接设置时区
+    timedatectl set-timezone "$PRESET_TIMEZONE"
+    dpkg-reconfigure --frontend=noninteractive tzdata > /dev/null 2>&1
+
+    # 设置语言环境
+    sed -i 's/# '"${PRESET_LOCALE}"'/'"${PRESET_LOCALE}"'/' /etc/locale.gen
+    echo -e "Generating locales: \x1B[92m${PRESET_LOCALE}\x1B[0m"
+    locale-gen "${PRESET_LOCALE}" > /dev/null 2>&1
+    update-locale LANG="$PRESET_LOCALE" LANGUAGE="$PRESET_LOCALE" LC_ALL="$PRESET_LOCALE"
+
+    # 为用户设置语言环境
+    if [ -n "$RealUserName" ]; then
+        {
+            echo "export LC_ALL=$PRESET_LOCALE"
+            echo "export LANG=$PRESET_LOCALE"
+            echo "export LANGUAGE=$PRESET_LOCALE"
+        } >> /home/"$RealUserName"/.bashrc
+        {
+            echo "export LC_ALL=$PRESET_LOCALE"
+            echo "export LANG=$PRESET_LOCALE"
+            echo "export LANGUAGE=$PRESET_LOCALE"
+        } >> /home/"$RealUserName"/.xsessionrc
+    fi
+}
+
+add_profile_sync_settings() {
+    if [[ ! -f /usr/bin/psd ]]; then
+        return 0
+    fi
+
+    /usr/bin/psd > /dev/null 2>&1
+    config_file="${HOME}/.config/psd/psd.conf"
+    if [ -f "${config_file}" ]; then
+        sed -i 's/#USE_OVERLAYFS=.*/USE_OVERLAYFS="yes"/' "${config_file}"
+        case $(/usr/bin/psd p 2> /dev/null | grep Overlayfs) in
+            *active*)
+                echo -e "\nConfigured profile sync daemon with overlayfs."
+                ;;
+            *)
+                echo -e "\nConfigured profile sync daemon."
+                sed -i 's/USE_OVERLAYFS="yes"/#USE_OVERLAYFS="no"/' "${config_file}"
+                ;;
+        esac
+    fi
+    systemctl --user enable psd.service > /dev/null 2>&1
+    systemctl --user start psd.service > /dev/null 2>&1
+}
+
+add_user() {
+    RealUserName="dsdz"
+    RealName="dsdz User"
+    
+    if ! id "$RealUserName" > /dev/null 2>&1; then
+        echo -e "\nCreating user $RealUserName..."
+        adduser --quiet --disabled-password --home /home/"$RealUserName" --gecos "$RealName" "$RealUserName"
+        echo "$RealUserName:$PRESET_USER_PASSWORD" | chpasswd
+        
+        for additionalgroup in sudo netdev audio video disk tty users games dialout plugdev input bluetooth systemd-journal ssh render; do
+            usermod -aG "${additionalgroup}" "${RealUserName}" 2> /dev/null
+        done
+
+        touch /home/"$RealUserName"/.Xauthority
+        chown "$RealUserName":"$RealUserName" /home/"$RealUserName"/.Xauthority
+        echo -e "\nUser \e[0;92m${RealUserName}\x1B[0m created with password \e[0;92m${PRESET_USER_PASSWORD}\x1B[0m"
+        
+        # set up profile sync daemon on desktop systems
+        if command -v psd > /dev/null 2>&1; then
+            echo -e "${RealUserName} ALL=(ALL) NOPASSWD: /usr/bin/psd-overlay-helper" >> /etc/sudoers
+            touch /home/"${RealUserName}"/.activate_psd
+            chown "$RealUserName":"$RealUserName" /home/"${RealUserName}"/.activate_psd
+        fi
+    else
+        echo -e "\nUser \e[0;92m${RealUserName}\x1B[0m already exists"
+    fi
+    
+    #rm -f /root/.not_logged_in_yet
+}
+
+if [[ -f /root/.not_logged_in_yet && -n $(tty) ]]; then
+    do_firstrun_automated_network_configuration
+
+    # disable autologin
+    rm -f /etc/systemd/system/getty@.service.d/override.conf
+    rm -f /etc/systemd/system/serial-getty@.service.d/override.conf
+    systemctl daemon-reload
+
+    declare desktop_dm="none"
+    declare -i desktop_is_sddm=0 desktop_is_lightdm=0 desktop_is_gdm3=0
+    if [[ -f /usr/bin/sddm ]]; then
+        desktop_dm="sddm"
+        desktop_is_sddm=1
+    fi
+    if [[ -f /usr/sbin/lightdm ]]; then
+        desktop_dm="lightdm"
+        desktop_is_lightdm=1
+    fi
+    if [[ -f /usr/sbin/gdm3 ]]; then
+        desktop_dm="gdm3"
+        desktop_is_gdm3=1
+    fi
+
+    echo -e "\nWaiting for system to finish booting..."
+    systemctl is-system-running --wait > /dev/null
+
+    # enable hiDPI support
+    if [[ "$(cut -d, -f1 < /sys/class/graphics/fb0/virtual_size 2> /dev/null)" -gt 1920 ]]; then
+        [[ -f /etc/lightdm/slick-greeter.conf ]] && echo "enable-hidpi = on" >> /etc/lightdm/slick-greeter.conf
+        [[ -f /etc/skel/.config/xfce4/xfconf/xfce-perchannel-xml/xsettings.xml ]] && sed -i 's|<property name="WindowScalingFactor" type="int" value=".*|<property name="WindowScalingFactor" type="int" value="2">|g' /etc/skel/.config/xfce4/xfconf/xfce-perchannel-xml/xsettings.xml
+        setfont /usr/share/consolefonts/Uni3-TerminusBold32x16.psf.gz
+    fi
+
+    clear
+
+    [[ -n "${VENDORPRETTYNAME}" ]] && VENDOR="$VENDORPRETTYNAME"
+    echo -e "Welcome to \e[1m\e[97m${VENDOR}\x1B[0m! \n"
+    echo -e "Documentation: \e[1m\e[92m${VENDORDOCS}\x1B[0m | Community support: \e[1m\e[92m${VENDORSUPPORT}\x1B[0m\n"
+
+    echo "" # empty line
+
+    get_local_ip_addr
+
+    echo "" # empty line
+
+    # Set root password
+    echo "root:$PRESET_ROOT_PASSWORD" | chpasswd
+    echo -e "\nRoot password set to: \e[0;92m$PRESET_ROOT_PASSWORD\x1B[0m"
+
+    # Set shell
+    set_shell
+
+    # Create user
+    add_user
+
+    # Set timezone and locales
+    set_timezone_and_locales
+
+    # re-enable passing locale environment via ssh
+    sed -e '/^#AcceptEnv LANG/ s/^#//' -i /etc/ssh/sshd_config
+    systemctl restart ssh.service
+
+    # Display support status
+    if [ "$IMAGE_TYPE" != "nightly" ]; then
+        if [[ "$BRANCH" == "edge" ]]; then
+            echo -e "\nSupport status: \e[0;31mcommunity support\x1B[0m (edge kernel branch)"
+        elif [[ "$DISTRIBUTION_STATUS" != "supported" ]]; then
+            echo -e "\nSupport status: \e[0;31mcommunity support\x1B[0m (unsupported userspace)"
+        elif [[ "$BOARD_TYPE" != "conf" ]]; then
+            echo -e "\nSupport status: \e[0;31mcommunity support\x1B[0m (looking for a dedicated maintainer)"
+        fi
+    else
+        echo -e "\e[0;31m\nWARNING!\x1B[0m\n\nYou are using an \e[0;31mautomated build\x1B[0m meant only for developers."
+    fi
+
+    # Desktop environment setup
+    if [[ "${desktop_dm}" == "lightdm" ]] && [ -n "$RealUserName" ]; then
+        mkdir -p /etc/lightdm/lightdm.conf.d
+        cat <<- EOF > /etc/lightdm/lightdm.conf.d/22-armbian-autologin.conf
+            [Seat:*]
+            autologin-user=$RealUserName
+            autologin-user-timeout=0
+            user-session=xfce
+EOF
+
+        # session detection
+        [[ -x $(command -v gnome-session) ]] && sed -i "s/user-session.*/user-session=ubuntu/" /etc/lightdm/lightdm.conf.d/22-armbian-autologin.conf
+        [[ -x $(command -v awesome) ]] && sed -i "s/user-session.*/user-session=awesome/" /etc/lightdm/lightdm.conf.d/22-armbian-autologin.conf
+        [[ -x $(command -v budgie-desktop) ]] && sed -i "s/user-session.*/user-session=budgie-desktop/" /etc/lightdm/lightdm.conf.d/22-armbian-autologin.conf
+        [[ -x $(command -v cinnamon) ]] && sed -i "s/user-session.*/user-session=cinnamon/" /etc/lightdm/lightdm.conf.d/22-armbian-autologin.conf
+        [[ -x $(command -v deepin-wm) ]] && sed -i "s/user-session.*/user-session=deepin/" /etc/lightdm/lightdm.conf.d/22-armbian-autologin.conf
+        [[ -x $(command -v icewm-session) ]] && sed -i "s/user-session.*/user-session=icewm-session/" /etc/lightdm/lightdm.conf.d/22-armbian-autologin.conf
+        [[ -x $(command -v i3) ]] && sed -i "s/user-session.*/user-session=i3/" /etc/lightdm/lightdm.conf.d/22-armbian-autologin.conf
+        [[ -x $(command -v startlxde) ]] && sed -i "s/user-session.*/user-session=LXDE/" /etc/lightdm/lightdm.conf.d/22-armbian-autologin.conf
+        [[ -x $(command -v startlxqt) ]] && sed -i "s/user-session.*/user-session=lxqt/" /etc/lightdm/lightdm.conf.d/22-armbian-autologin.conf
+        [[ -x $(command -v mate-wm) ]] && sed -i "s/user-session.*/user-session=mate/" /etc/lightdm/lightdm.conf.d/22-armbian-autologin.conf
+        [[ -x $(command -v sway) ]] && sed -i "s/user-session.*/user-session=sway/" /etc/lightdm/lightdm.conf.d/22-armbian-autologin.conf
+        [[ -x $(command -v xmonad) ]] && sed -i "s/user-session.*/user-session=xmonad/" /etc/lightdm/lightdm.conf.d/22-armbian-autologin.conf
+
+        ln -sf /lib/systemd/system/lightdm.service /etc/systemd/system/display-manager.service
+
+        if [[ -f /var/run/resize2fs-reboot ]]; then
+            printf "\n\n\e[0;91mWarning: a reboot is needed to finish resizing the filesystem \x1B[0m \n"
+            printf "\e[0;91mPlease reboot the system now \x1B[0m \n\n"
+        else
+            echo -e "\n\e[1m\e[39mNow starting desktop environment...\x1B[0m\n"
+            sleep 1
+            service lightdm start 2> /dev/null
+            systemctl -q enable armbian-disable-autologin.timer
+            systemctl start armbian-disable-autologin.timer
+            who -la | grep root | grep -q tty1 && exit 1
+        fi
+
+    elif [[ "${desktop_dm}" == "gdm3" ]] && [ -n "$RealUserName" ]; then
+        mkdir -p /etc/gdm3
+        cat <<- EOF > /etc/gdm3/custom.conf
+            [daemon]
+            AutomaticLoginEnable = true
+            AutomaticLogin = $RealUserName
+EOF
+
+        ln -sf /lib/systemd/system/gdm3.service /etc/systemd/system/display-manager.service
+
+        if [[ -f /var/run/resize2fs-reboot ]]; then
+            printf "\n\n\e[0;91mWarning: a reboot is needed to finish resizing the filesystem \x1B[0m \n"
+            printf "\e[0;91mPlease reboot the system now \x1B[0m \n\n"
+        else
+            echo -e "\n\e[1m\e[39mNow starting desktop environment...\x1B[0m\n"
+            sleep 1
+            service gdm3 start 2> /dev/null
+            (
+                sleep 20
+                sed -i "s/AutomaticLoginEnable.*/AutomaticLoginEnable = false/" /etc/gdm3/custom.conf
+            ) &
+            who -la | grep root | grep -q tty1 && exit 1
+        fi
+    elif [[ "${desktop_dm}" == "sddm" ]] && [ -n "$RealUserName" ]; then
+        mkdir -p /etc/sddm.conf.d
+        cat <<- EOF > /etc/sddm.conf.d/armbian.conf
+            [Theme]
+            Current=breeze
+            [General]
+            InputMethod=none
+EOF
+
+        cat <<- EOF > /etc/sddm.conf.d/autologin.conf
+            [Autologin]
+            User=$RealUserName
+EOF
+        echo -e "\n\e[1m\e[39mNow starting desktop environment via ${desktop_dm}...\x1B[0m\n"
+        systemctl enable --now sddm 2> /dev/null
+        systemctl -q enable armbian-disable-autologin.timer
+        who -la | grep root | grep -q tty1 && exit 1
+
+    else
+        clear
+        run-parts --lsbsysinit /etc/update-motd.d
+
+        if [[ -f /var/run/resize2fs-reboot ]]; then
+            printf "\n\n\e[0;91mWarning: a reboot is needed to finish resizing the filesystem \x1B[0m \n"
+            printf "\e[0;91mPlease reboot the system now \x1B[0m \n\n"
+        fi
+    fi
+fi
+
+sync

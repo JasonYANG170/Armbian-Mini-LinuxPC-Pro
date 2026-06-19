@@ -1,0 +1,36 @@
+
+编译过程需要保持外网畅通，需要透明代理，建议在openwrt路由器上搭建ssr代理环境
+
+#主编译命令
+./compile.sh build BOARD=dsdz-h618 BRANCH=current
+
+#直接编译gnome桌面ubuntu22.04固件
+./compile.sh build BOARD=dsdz-h618 BRANCH=current BUILD_DESKTOP=yes BUILD_MINIMAL=no DESKTOP_APPGROUPS_SELECTED='browsers multimedia' DESKTOP_ENVIRONMENT=gnome DESKTOP_ENVIRONMENT_CONFIG_NAME=config_base KERNEL_CONFIGURE=yes RELEASE=jammy 
+
+#直接编译最小功能固件
+./compile.sh build BOARD=dsdz-h618 BRANCH=current BUILD_DESKTOP=no BUILD_MINIMAL=yes KERNEL_CONFIGURE=yes RELEASE=jammy
+
+
+#如果要编译RT内核的固件，将/root/build-dsdz-h618/patch/kernel/archive/sunxi-6.6/patches.armbian/下的
+arm64-dts-sunxi-h618-dsdz-h618.patch 替换成 arm64-dts-sunxi-h618-dsdz-h618(rt).patch
+#然后检测下面几个内核选项
+CONFIG_PREEMPT_RT=y
+CONFIG_PREEMPTION=y
+CONFIG_HIGH_RES_TIMERS=y
+CONFIG_IRQ_TIME_ACCOUNTING=y
+
+
+#构建配置
+/root/build-dsdz-h618/config/boards/dsdz-h618.csc
+
+#内核补丁路径
+/root/build-dsdz-h618/patch/kernel/archive/sunxi-6.6/patches.armbian/arm64-dts-sunxi-h618-dsdz-h618.patch
+
+#板级设备树路径
+/root/build-dsdz-h618/myfile/sun50i-h618-dsdz-h618.dts
+
+#芯片级设备树路径
+/root/build-dsdz-h618/myfile/sun50i-h616.dtsi
+
+#板级设备树路径
+/root/build-dsdz-h618/myfile/sun50i-h618-dsdz-h618.dts
