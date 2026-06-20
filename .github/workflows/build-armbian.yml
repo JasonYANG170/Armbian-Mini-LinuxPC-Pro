@@ -5,7 +5,6 @@ on:
     branches: [ main ]
     paths:
       - 'myfile/**'
-      - 'scripts/**'
       - '.github/workflows/build-armbian.yml'
   workflow_dispatch:
     inputs:
@@ -41,36 +40,54 @@ jobs:
     - name: Install dependencies
       run: |
         sudo apt-get update
-        sudo apt-get install -y wget xz-utils device-tree-compiler python3
+        sudo apt-get install -y wget xz-utils device-tree-compiler gcc
 
     - name: Compile DSDZ-H618 DTB
       run: |
         set -e
-        mkdir -p /tmp/dtb-build/dt-bindings/{gpio,interrupt-controller,leds}
+        mkdir -p /tmp/dtb-build/include
 
-        # 复制 dtsi 文件
-        cp myfile/sun50i-h616.dtsi /tmp/dtb-build/
-        cp myfile/sun50i-h616-cpu-opp.dtsi /tmp/dtb-build/
+        # 下载内核 v6.12 的 dt-bindings 头文件
+        KERNEL_GIT="https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git/plain/include"
+        KERNEL_TAG="v6.12.23"
+        mkdir -p /tmp/dtb-build/include/dt-bindings/{clock,reset,thermal,interrupt-controller,gpio,leds,pinctrl}
+        for f in \
+          "dt-bindings/gpio/gpio.h" \
+          "dt-bindings/interrupt-controller/arm-gic.h" \
+          "dt-bindings/leds/common.h" \
+          "dt-bindings/thermal/thermal.h" \
+          "dt-bindings/clock/sun50i-h616-ccu.h" \
+          "dt-bindings/clock/sun50i-h6-r-ccu.h" \
+          "dt-bindings/clock/sun6i-rtc.h" \
+          "dt-bindings/clock/sun8i-de2.h" \
+          "dt-bindings/clock/sun8i-tcon-top.h" \
+          "dt-bindings/reset/sun50i-h616-ccu.h" \
+          "dt-bindings/reset/sun50i-h6-r-ccu.h" \
+          "dt-bindings/reset/sun8i-de2.h" \
+          "dt-bindings/pinctrl/sun50i-h616.h" \
+        ; do
+          echo "Downloading $f ..."
+          wget -q "${KERNEL_GIT}/${f}?h=${KERNEL_TAG}" -O "/tmp/dtb-build/include/${f}" || \
+            echo "WARNING: Failed to download $f"
+        done
 
-        # 下载 dt-bindings 头文件
-        BASE="https://raw.githubusercontent.com/torvalds/linux/v6.12/include"
-        wget -q "$BASE/dt-bindings/gpio/gpio.h" -O /tmp/dtb-build/dt-bindings/gpio/gpio.h
-        wget -q "$BASE/dt-bindings/interrupt-controller/arm-gic.h" -O /tmp/dtb-build/dt-bindings/interrupt-controller/arm-gic.h
-        wget -q "$BASE/dt-bindings/leds/common.h" -O /tmp/dtb-build/dt-bindings/leds/common.h
+        # 复制 dtsi 文件到 include 目录
+        cp myfile/sun50i-h616.dtsi /tmp/dtb-build/include/
+        cp myfile/sun50i-h616-cpu-opp.dtsi /tmp/dtb-build/include/
 
-        # 预处理 DTS（内联 #include）
-        python3 scripts/preprocess_dts.py \
+        # 用 cpp 预处理 DTS（解析所有 #include 和宏）
+        cpp -nostdinc -I/tmp/dtb-build/include -undef -x assembler-with-cpp \
           myfile/sun50i-h618-dsdz-h618.dts \
-          /tmp/dtb-build/sun50i-h618-dsdz-h618.preprocessed.dts \
-          /tmp/dtb-build
+          /tmp/dtb-build/sun50i-h618-dsdz-h618.preprocessed.dts
+
+        # 清理 cpp 产生的行标记
+        sed -i '/^# [0-9]/d' /tmp/dtb-build/sun50i-h618-dsdz-h618.preprocessed.dts
+
+        echo "Preprocessed DTS lines: $(wc -l < /tmp/dtb-build/sun50i-h618-dsdz-h618.preprocessed.dts)"
 
         # 编译 DTB
-        dtc -I dts -O dtb -@ -o /tmp/dtb-build/sun50i-h618-dsdz-h618.dtb \
-          /tmp/dtb-build/sun50i-h618-dsdz-h618.preprocessed.dts 2>&1 || {
-          echo "DTB compilation failed, trying without -@ flag..."
-          dtc -I dts -O dtb -o /tmp/dtb-build/sun50i-h618-dsdz-h618.dtb \
-            /tmp/dtb-build/sun50i-h618-dsdz-h618.preprocessed.dts
-        }
+        dtc -I dts -O dtb -o /tmp/dtb-build/sun50i-h618-dsdz-h618.dtb \
+          /tmp/dtb-build/sun50i-h618-dsdz-h618.preprocessed.dts
 
         ls -lh /tmp/dtb-build/sun50i-h618-dsdz-h618.dtb
         echo "DTB compiled successfully!"
