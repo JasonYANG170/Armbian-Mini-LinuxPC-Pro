@@ -37,7 +37,7 @@ jobs:
     - name: Install dependencies
       run: |
         sudo apt-get update
-        sudo apt-get install -y wget xz-utils kpartx
+        sudo apt-get install -y wget xz-utils
 
     - name: Download official Armbian image
       run: |
@@ -65,46 +65,41 @@ jobs:
     - name: Mount and modify image
       run: |
         set -e
-        mkdir -p /tmp/armbian/boot /tmp/armbian/root
+        mkdir -p /tmp/armbian/root
 
-        # 使用 kpartx 映射分区
-        KPARTX_OUT=$(sudo kpartx -av armbian-base.img)
-        echo "$KPARTX_OUT"
-        # 获取 loop 设备名
-        LOOP_DEV=$(echo "$KPARTX_OUT" | grep -oP 'loop\d+' | head -1)
-        echo "Loop device: $LOOP_DEV"
+        # 单分区镜像：直接挂载第一个分区
+        # 使用 offset 跳过 MBR (8192 sectors * 512 = 4194304 bytes)
+        LOOP=$(sudo losetup -f --show -o 4194304 armbian-base.img)
+        echo "Loop device: $LOOP"
+        sudo mount $LOOP /tmp/armbian/root
 
-        # 等待设备节点就绪
-        sleep 2
-
-        # 挂载分区（Armbian: p1=boot, p2=rootfs）
-        sudo mount /dev/mapper/${LOOP_DEV}p1 /tmp/armbian/boot
-        sudo mount /dev/mapper/${LOOP_DEV}p2 /tmp/armbian/root
+        echo "=== Boot files ==="
+        ls /tmp/armbian/root/boot/
 
         echo "=== Original armbianEnv.txt ==="
-        cat /tmp/armbian/boot/armbianEnv.txt
-        sudo cp /tmp/armbian/boot/armbianEnv.txt /tmp/armbian/boot/armbianEnv.txt.orig
+        cat /tmp/armbian/root/boot/armbianEnv.txt
+        sudo cp /tmp/armbian/root/boot/armbianEnv.txt /tmp/armbian/root/boot/armbianEnv.txt.orig
 
-        ROOT_UUID=$(sudo blkid -s UUID -o value /dev/mapper/${LOOP_DEV}p2)
+        ROOT_UUID=$(sudo blkid -s UUID -o value $LOOP)
         echo "Root UUID: $ROOT_UUID"
 
-        printf 'verbosity=1\nbootlogo=false\noverlay_prefix=sun50i-h616\nfdtfile=allwinner/sun50i-h618-dsdz-h618.dtb\nrootdev=UUID=%s\nrootfstype=ext4\nrootflags=commit=5,noatime\n' "$ROOT_UUID" | sudo tee /tmp/armbian/boot/armbianEnv.txt > /dev/null
+        printf 'verbosity=1\nbootlogo=false\noverlay_prefix=sun50i-h616\nfdtfile=allwinner/sun50i-h618-dsdz-h618.dtb\nrootdev=UUID=%s\nrootfstype=ext4\nrootflags=commit=5,noatime\n' "$ROOT_UUID" | sudo tee /tmp/armbian/root/boot/armbianEnv.txt > /dev/null
 
         echo "=== New armbianEnv.txt ==="
-        cat /tmp/armbian/boot/armbianEnv.txt
+        cat /tmp/armbian/root/boot/armbianEnv.txt
 
-        # DTB: 如有预编译DTB则使用，否则复制 OrangePi Zero3 DTB
+        # DTB
         DTB_SRC="build-armbian/armbian-files/platform-files/allwinner/bootfs/dtb/allwinner/sun50i-h618-dsdz-h618.dtb"
         if [ -f "$DTB_SRC" ]; then
           echo "Adding custom DSDZ-H618 DTB..."
-          sudo cp "$DTB_SRC" /tmp/armbian/boot/dtb/allwinner/
+          sudo cp "$DTB_SRC" /tmp/armbian/root/boot/dtb/allwinner/
         else
           echo "No custom DTB, copying OrangePi Zero3 DTB as DSDZ-H618"
-          sudo cp /tmp/armbian/boot/dtb/allwinner/sun50i-h618-orangepi-zero3.dtb \
-                   /tmp/armbian/boot/dtb/allwinner/sun50i-h618-dsdz-h618.dtb
+          sudo cp /tmp/armbian/root/boot/dtb/allwinner/sun50i-h618-orangepi-zero3.dtb \
+                   /tmp/armbian/root/boot/dtb/allwinner/sun50i-h618-dsdz-h618.dtb
         fi
 
-        # 应用 rootfs overlay
+        # Rootfs overlay
         OVERLAY_DIR="myfile/overlay_rootfs"
         if [ -d "$OVERLAY_DIR" ]; then
           echo "Applying rootfs overlay from $OVERLAY_DIR ..."
@@ -114,10 +109,10 @@ jobs:
           echo "WARNING: No overlay directory at $OVERLAY_DIR"
         fi
 
-        # 卸载
-        sudo umount /tmp/armbian/boot
+        # Sync and unmount
+        sync
         sudo umount /tmp/armbian/root
-        sudo kpartx -d armbian-base.img
+        sudo losetup -d $LOOP
 
         echo "Image modified successfully"
 
