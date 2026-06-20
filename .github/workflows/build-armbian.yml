@@ -47,40 +47,31 @@ jobs:
         set -e
         mkdir -p /tmp/dtb-build/include
 
-        # 下载内核 v6.12 的 dt-bindings 头文件
-        KERNEL_GIT="https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git/plain/include"
-        KERNEL_TAG="v6.12.23"
-        mkdir -p /tmp/dtb-build/include/dt-bindings/{clock,reset,thermal,interrupt-controller,gpio,leds,pinctrl}
-        for f in \
-          "dt-bindings/gpio/gpio.h" \
-          "dt-bindings/interrupt-controller/arm-gic.h" \
-          "dt-bindings/leds/common.h" \
-          "dt-bindings/thermal/thermal.h" \
-          "dt-bindings/clock/sun50i-h616-ccu.h" \
-          "dt-bindings/clock/sun50i-h6-r-ccu.h" \
-          "dt-bindings/clock/sun6i-rtc.h" \
-          "dt-bindings/clock/sun8i-de2.h" \
-          "dt-bindings/clock/sun8i-tcon-top.h" \
-          "dt-bindings/reset/sun50i-h616-ccu.h" \
-          "dt-bindings/reset/sun50i-h6-r-ccu.h" \
-          "dt-bindings/reset/sun8i-de2.h" \
-          "dt-bindings/pinctrl/sun50i-h616.h" \
-        ; do
-          echo "Downloading $f ..."
-          wget -q "${KERNEL_GIT}/${f}?h=${KERNEL_TAG}" -O "/tmp/dtb-build/include/${f}" || \
-            echo "WARNING: Failed to download $f"
-        done
+        # 下载内核 dt-bindings 头文件（git sparse checkout）
+        cd /tmp
+        git init kernel-headers
+        cd kernel-headers
+        git remote add origin https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git
+        git config core.sparseCheckout true
+        echo "include/dt-bindings" > .git/info/sparse-checkout
+        git fetch --depth=1 origin v6.12.23
+        git checkout FETCH_HEAD
 
-        # 复制 dtsi 文件到 include 目录
-        cp myfile/sun50i-h616.dtsi /tmp/dtb-build/include/
-        cp myfile/sun50i-h616-cpu-opp.dtsi /tmp/dtb-build/include/
+        # 复制到 include 目录
+        cp -r include/dt-bindings /tmp/dtb-build/include/
 
-        # 用 cpp 预处理 DTS（解析所有 #include 和宏）
+        # 复制 dtsi 文件
+        cp "$GITHUB_WORKSPACE/myfile/sun50i-h616.dtsi" /tmp/dtb-build/include/
+        cp "$GITHUB_WORKSPACE/myfile/sun50i-h616-cpu-opp.dtsi" /tmp/dtb-build/include/
+
+        cd "$GITHUB_WORKSPACE"
+
+        # 用 cpp 预处理 DTS
         cpp -nostdinc -I/tmp/dtb-build/include -undef -x assembler-with-cpp \
           myfile/sun50i-h618-dsdz-h618.dts \
           /tmp/dtb-build/sun50i-h618-dsdz-h618.preprocessed.dts
 
-        # 清理 cpp 产生的行标记
+        # 清理 cpp 行标记
         sed -i '/^# [0-9]/d' /tmp/dtb-build/sun50i-h618-dsdz-h618.preprocessed.dts
 
         echo "Preprocessed DTS lines: $(wc -l < /tmp/dtb-build/sun50i-h618-dsdz-h618.preprocessed.dts)"
@@ -92,7 +83,7 @@ jobs:
         ls -lh /tmp/dtb-build/sun50i-h618-dsdz-h618.dtb
         echo "DTB compiled successfully!"
 
-        # 复制到 repo 目录供后续使用
+        # 复制到 repo 目录
         mkdir -p build-armbian/armbian-files/platform-files/allwinner/bootfs/dtb/allwinner
         cp /tmp/dtb-build/sun50i-h618-dsdz-h618.dtb \
            build-armbian/armbian-files/platform-files/allwinner/bootfs/dtb/allwinner/
@@ -124,25 +115,17 @@ jobs:
       run: |
         set -e
         mkdir -p /tmp/armbian/root
-
-        # 单分区镜像：直接挂载第一个分区
         LOOP=$(sudo losetup -f --show -o 4194304 armbian-base.img)
         echo "Loop device: $LOOP"
         sudo mount $LOOP /tmp/armbian/root
-
         echo "=== Original armbianEnv.txt ==="
         cat /tmp/armbian/root/boot/armbianEnv.txt
         sudo cp /tmp/armbian/root/boot/armbianEnv.txt /tmp/armbian/root/boot/armbianEnv.txt.orig
-
         ROOT_UUID=$(sudo blkid -s UUID -o value $LOOP)
         echo "Root UUID: $ROOT_UUID"
-
         printf 'verbosity=1\nbootlogo=false\noverlay_prefix=sun50i-h616\nfdtfile=allwinner/sun50i-h618-dsdz-h618.dtb\nrootdev=UUID=%s\nrootfstype=ext4\nrootflags=commit=5,noatime\n' "$ROOT_UUID" | sudo tee /tmp/armbian/root/boot/armbianEnv.txt > /dev/null
-
         echo "=== New armbianEnv.txt ==="
         cat /tmp/armbian/root/boot/armbianEnv.txt
-
-        # 使用编译好的 DSDZ-H618 DTB（含 ST7789V 显示支持）
         DTB_SRC="build-armbian/armbian-files/platform-files/allwinner/bootfs/dtb/allwinner/sun50i-h618-dsdz-h618.dtb"
         if [ -f "$DTB_SRC" ]; then
           echo "Installing DSDZ-H618 DTB with ST7789V display support..."
@@ -151,22 +134,14 @@ jobs:
           echo "ERROR: DTB not found at $DTB_SRC"
           exit 1
         fi
-
-        # Rootfs overlay (WiFi firmware, first-login script, EMMC tool)
         OVERLAY_DIR="myfile/overlay_rootfs"
         if [ -d "$OVERLAY_DIR" ]; then
-          echo "Applying rootfs overlay from $OVERLAY_DIR ..."
+          echo "Applying rootfs overlay..."
           sudo cp -rT "$OVERLAY_DIR" /tmp/armbian/root/
-          echo "Overlay applied"
-        else
-          echo "WARNING: No overlay directory at $OVERLAY_DIR"
         fi
-
-        # Sync and unmount
         sync
         sudo umount /tmp/armbian/root
         sudo losetup -d $LOOP
-
         echo "Image modified successfully"
 
     - name: Compress and publish
