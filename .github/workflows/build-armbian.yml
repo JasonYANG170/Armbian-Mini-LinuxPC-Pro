@@ -20,6 +20,9 @@ on:
 env:
   RELEASE: ${{ github.event.inputs.armbian_release || 'noble' }}
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-22.04
