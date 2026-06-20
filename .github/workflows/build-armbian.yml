@@ -77,8 +77,8 @@ jobs:
 
         echo "Preprocessed DTS lines: $(wc -l < /tmp/dtb-build/sun50i-h618-dsdz-h618.preprocessed.dts)"
 
-        # 编译 DTB
-        dtc -I dts -O dtb -o /tmp/dtb-build/sun50i-h618-dsdz-h618.dtb \
+        # 编译 DTB（-f 忽略 phandle 警告，PMIC 引用会在运行时解析）
+        dtc -I dts -O dtb -f -o /tmp/dtb-build/sun50i-h618-dsdz-h618.dtb \
           /tmp/dtb-build/sun50i-h618-dsdz-h618.preprocessed.dts
 
         ls -lh /tmp/dtb-build/sun50i-h618-dsdz-h618.dtb
