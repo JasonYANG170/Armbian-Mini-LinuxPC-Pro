@@ -4,9 +4,10 @@ Date: Mon, 1 Jan 2024 00:00:00 +0800
 Subject: Add DSDZ-H618 board support
 
 ---
- arch/arm/dts/Makefile               |   1 +
- configs/dsdz-h618_defconfig          |  31 ++++++
- 2 files changed, 32 insertions(+)
+ arch/arm/dts/Makefile                  |   1 +
+ arch/arm/dts/sun50i-h618-dsdz-h618.dts | 136 +++++++++++++++++++++++
+ configs/dsdz-h618_defconfig            |  31 ++++++
+ 3 files changed, 168 insertions(+)
 
 diff --git a/arch/arm/dts/Makefile b/arch/arm/dts/Makefile
 --- a/arch/arm/dts/Makefile
@@ -20,6 +21,146 @@ diff --git a/arch/arm/dts/Makefile b/arch/arm/dts/Makefile
  dtb-$(CONFIG_MACH_SUN50I) += \
  	sun50i-a64-amarula-relic.dtb \
  	sun50i-a64-bananapi-m64.dtb \
+
+diff --git a/arch/arm/dts/sun50i-h618-dsdz-h618.dts b/arch/arm/dts/sun50i-h618-dsdz-h618.dts
+new file mode 100644
+--- /dev/null
++++ b/arch/arm/dts/sun50i-h618-dsdz-h618.dts
+@@ -0,0 +1,136 @@
++// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
++/*
++ * Copyright (C) 2024 Mori Ltd. <mori@mori.pro>
++ *
++ * For DSDZ-H618 An Mini Core 1/2G DDR4 DRAM
++ * Power By Mori
++ */
++
++/dts-v1/;
++
++#include "sun50i-h616.dtsi"
++
++#include <dt-bindings/gpio/gpio.h>
++#include <dt-bindings/interrupt-controller/arm-gic.h>
++#include <dt-bindings/leds/common.h>
++
++/ {
++	model = "DSDZ H618";
++	compatible = "DSDZ,DSDZ-H618", "allwinner,sun50i-h618";
++
++	aliases {
++		serial0 = &uart0;
++	};
++
++	chosen {
++		stdout-path = "serial0:115200n8";
++	};
++
++	reg_vcc5v: regulator-5v {
++		compatible = "regulator-fixed";
++		regulator-name = "vcc-5v";
++		regulator-min-microvolt = <5000000>;
++		regulator-max-microvolt = <5000000>;
++		regulator-always-on;
++	};
++
++	reg_usb_vbus: regulator-usb-vbus {
++		compatible = "regulator-fixed";
++		regulator-name = "usb-vbus";
++		regulator-min-microvolt = <5000000>;
++		regulator-max-microvolt = <5000000>;
++		vin-supply = <&reg_vcc5v>;
++	};
++};
++
++&cpu0 {
++	cpu-supply = <&reg_dcdc2>;
++};
++
++&mmc0 {
++	vmmc-supply = <&reg_dldo1>;
++	cd-gpios = <&pio 5 6 GPIO_ACTIVE_LOW>;
++	bus-width = <4>;
++	max-frequency = <25000000>;
++	status = "okay";
++};
++
++&mmc2 {
++	vmmc-supply = <&reg_dldo1>;
++	vqmmc-supply = <&reg_aldo1>;
++	bus-width = <8>;
++	non-removable;
++	cap-mmc-hw-reset;
++	mmc-hs200-1_8v;
++	max-frequency = <25000000>;
++	status = "okay";
++};
++
++&pio {
++	vcc-pc-supply = <&reg_aldo1>;
++	vcc-pf-supply = <&reg_dldo1>;
++	vcc-pg-supply = <&reg_dldo1>;
++	vcc-ph-supply = <&reg_dldo1>;
++	vcc-pi-supply = <&reg_dldo1>;
++};
++
++&r_i2c {
++	status = "okay";
++
++	axp313: pmic@36 {
++		compatible = "x-powers,axp313a";
++		reg = <0x36>;
++		#interrupt-cells = <1>;
++		interrupt-controller;
++		interrupt-parent = <&pio>;
++
++		vin1-supply = <&reg_vcc5v>;
++		vin2-supply = <&reg_vcc5v>;
++		vin3-supply = <&reg_vcc5v>;
++
++		regulators {
++			reg_aldo1: aldo1 {
++				regulator-always-on;
++				regulator-min-microvolt = <1800000>;
++				regulator-max-microvolt = <1800000>;
++				regulator-name = "vcc-1v8-pll";
++			};
++
++			reg_dldo1: dldo1 {
++				regulator-always-on;
++				regulator-min-microvolt = <3300000>;
++				regulator-max-microvolt = <3300000>;
++				regulator-name = "vcc-3v3-io";
++			};
++
++			reg_dcdc1: dcdc1 {
++				regulator-always-on;
++				regulator-min-microvolt = <810000>;
++				regulator-max-microvolt = <990000>;
++				regulator-name = "vdd-gpu-sys";
++			};
++
++			reg_dcdc2: dcdc2 {
++				regulator-always-on;
++				regulator-min-microvolt = <810000>;
++				regulator-max-microvolt = <1100000>;
++				regulator-name = "vdd-cpu";
++			};
++
++			reg_dcdc3: dcdc3 {
++				regulator-always-on;
++				regulator-min-microvolt = <1100000>;
++				regulator-max-microvolt = <1100000>;
++				regulator-name = "vdd-dram";
++			};
++		};
++	};
++};
++
++&uart0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&uart0_ph_pins>;
++	status = "okay";
++};
 
 diff --git a/configs/dsdz-h618_defconfig b/configs/dsdz-h618_defconfig
 new file mode 100644
