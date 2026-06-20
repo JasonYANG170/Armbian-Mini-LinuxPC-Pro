@@ -5,6 +5,7 @@ on:
     branches: [ main ]
     paths:
       - 'myfile/**'
+      - 'scripts/**'
       - '.github/workflows/build-armbian.yml'
   workflow_dispatch:
     inputs:
@@ -40,7 +41,44 @@ jobs:
     - name: Install dependencies
       run: |
         sudo apt-get update
-        sudo apt-get install -y wget xz-utils
+        sudo apt-get install -y wget xz-utils device-tree-compiler python3
+
+    - name: Compile DSDZ-H618 DTB
+      run: |
+        set -e
+        mkdir -p /tmp/dtb-build/dt-bindings/{gpio,interrupt-controller,leds}
+
+        # 复制 dtsi 文件
+        cp myfile/sun50i-h616.dtsi /tmp/dtb-build/
+        cp myfile/sun50i-h616-cpu-opp.dtsi /tmp/dtb-build/
+
+        # 下载 dt-bindings 头文件
+        BASE="https://raw.githubusercontent.com/torvalds/linux/v6.12/include"
+        wget -q "$BASE/dt-bindings/gpio/gpio.h" -O /tmp/dtb-build/dt-bindings/gpio/gpio.h
+        wget -q "$BASE/dt-bindings/interrupt-controller/arm-gic.h" -O /tmp/dtb-build/dt-bindings/interrupt-controller/arm-gic.h
+        wget -q "$BASE/dt-bindings/leds/common.h" -O /tmp/dtb-build/dt-bindings/leds/common.h
+
+        # 预处理 DTS（内联 #include）
+        python3 scripts/preprocess_dts.py \
+          myfile/sun50i-h618-dsdz-h618.dts \
+          /tmp/dtb-build/sun50i-h618-dsdz-h618.preprocessed.dts \
+          /tmp/dtb-build
+
+        # 编译 DTB
+        dtc -I dts -O dtb -@ -o /tmp/dtb-build/sun50i-h618-dsdz-h618.dtb \
+          /tmp/dtb-build/sun50i-h618-dsdz-h618.preprocessed.dts 2>&1 || {
+          echo "DTB compilation failed, trying without -@ flag..."
+          dtc -I dts -O dtb -o /tmp/dtb-build/sun50i-h618-dsdz-h618.dtb \
+            /tmp/dtb-build/sun50i-h618-dsdz-h618.preprocessed.dts
+        }
+
+        ls -lh /tmp/dtb-build/sun50i-h618-dsdz-h618.dtb
+        echo "DTB compiled successfully!"
+
+        # 复制到 repo 目录供后续使用
+        mkdir -p build-armbian/armbian-files/platform-files/allwinner/bootfs/dtb/allwinner
+        cp /tmp/dtb-build/sun50i-h618-dsdz-h618.dtb \
+           build-armbian/armbian-files/platform-files/allwinner/bootfs/dtb/allwinner/
 
     - name: Download official Armbian image
       run: |
@@ -71,13 +109,9 @@ jobs:
         mkdir -p /tmp/armbian/root
 
         # 单分区镜像：直接挂载第一个分区
-        # 使用 offset 跳过 MBR (8192 sectors * 512 = 4194304 bytes)
         LOOP=$(sudo losetup -f --show -o 4194304 armbian-base.img)
         echo "Loop device: $LOOP"
         sudo mount $LOOP /tmp/armbian/root
-
-        echo "=== Boot files ==="
-        ls /tmp/armbian/root/boot/
 
         echo "=== Original armbianEnv.txt ==="
         cat /tmp/armbian/root/boot/armbianEnv.txt
@@ -91,18 +125,17 @@ jobs:
         echo "=== New armbianEnv.txt ==="
         cat /tmp/armbian/root/boot/armbianEnv.txt
 
-        # DTB
+        # 使用编译好的 DSDZ-H618 DTB（含 ST7789V 显示支持）
         DTB_SRC="build-armbian/armbian-files/platform-files/allwinner/bootfs/dtb/allwinner/sun50i-h618-dsdz-h618.dtb"
         if [ -f "$DTB_SRC" ]; then
-          echo "Adding custom DSDZ-H618 DTB..."
+          echo "Installing DSDZ-H618 DTB with ST7789V display support..."
           sudo cp "$DTB_SRC" /tmp/armbian/root/boot/dtb/allwinner/
         else
-          echo "No custom DTB, copying OrangePi Zero3 DTB as DSDZ-H618"
-          sudo cp /tmp/armbian/root/boot/dtb/allwinner/sun50i-h618-orangepi-zero3.dtb \
-                   /tmp/armbian/root/boot/dtb/allwinner/sun50i-h618-dsdz-h618.dtb
+          echo "ERROR: DTB not found at $DTB_SRC"
+          exit 1
         fi
 
-        # Rootfs overlay
+        # Rootfs overlay (WiFi firmware, first-login script, EMMC tool)
         OVERLAY_DIR="myfile/overlay_rootfs"
         if [ -d "$OVERLAY_DIR" ]; then
           echo "Applying rootfs overlay from $OVERLAY_DIR ..."
