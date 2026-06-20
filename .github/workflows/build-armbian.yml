@@ -95,7 +95,7 @@ jobs:
         RELEASE="${{ env.RELEASE }}"
         MIRROR_BASE="https://mirrors.tuna.tsinghua.edu.cn/armbian-releases/orangepizero3/archive"
         FILE_LIST=$(curl -sL "$MIRROR_BASE/" | grep -oP 'href="(Armbian_[^"]*\.img\.xz)"' | sed 's/href="//;s/"//')
-        DOWNLOAD_FILE=$(echo "$FILE_LIST" | grep -i "_${RELEASE}_" | grep -i "minimal" | head -1)
+        DOWNLOAD_FILE=$(echo "$FILE_LIST" | grep -i "_${RELEASE}_" | grep -i "desktop" | head -1)
         if [ -z "$DOWNLOAD_FILE" ]; then
           DOWNLOAD_FILE=$(echo "$FILE_LIST" | grep -i "_${RELEASE}_" | head -1)
         fi
