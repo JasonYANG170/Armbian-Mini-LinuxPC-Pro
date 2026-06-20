@@ -1,11 +1,6 @@
-Index: drivers/mmc/sunxi_mmc.c
-IDEA additional info:
-Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
-<+>UTF-8
-===================================================================
 diff --git a/drivers/mmc/sunxi_mmc.c b/drivers/mmc/sunxi_mmc.c
---- a/drivers/mmc/sunxi_mmc.c	(revision 866ca972d6c3cabeaf6dbac431e8e08bb30b3c8e)
-+++ b/drivers/mmc/sunxi_mmc.c	(date 1727666286495)
+--- a/drivers/mmc/sunxi_mmc.c
++++ b/drivers/mmc/sunxi_mmc.c
 @@ -492,7 +492,7 @@
 
  	/* Reset controller */
@@ -57,14 +52,9 @@ diff --git a/drivers/mmc/sunxi_mmc.c b/drivers/mmc/sunxi_mmc.c
 
  	priv->reg = dev_read_addr_ptr(dev);
 
-Index: arch/arm/dts/Makefile
-IDEA additional info:
-Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
-<+>UTF-8
-===================================================================
 diff --git a/arch/arm/dts/Makefile b/arch/arm/dts/Makefile
---- a/arch/arm/dts/Makefile	(revision 866ca972d6c3cabeaf6dbac431e8e08bb30b3c8e)
-+++ b/arch/arm/dts/Makefile	(date 1727657417383)
+--- a/arch/arm/dts/Makefile
++++ b/arch/arm/dts/Makefile
 @@ -836,7 +836,8 @@
  dtb-$(CONFIG_MACH_SUN50I_H616) += \
  	sun50i-h616-orangepi-zero2.dtb \
@@ -75,14 +65,9 @@ diff --git a/arch/arm/dts/Makefile b/arch/arm/dts/Makefile
  dtb-$(CONFIG_MACH_SUN50I) += \
  	sun50i-a64-amarula-relic.dtb \
  	sun50i-a64-bananapi-m64.dtb \
-Index: arch/arm/include/asm/arch-sunxi/dram.h
-IDEA additional info:
-Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
-<+>UTF-8
-===================================================================
 diff --git a/arch/arm/include/asm/arch-sunxi/dram.h b/arch/arm/include/asm/arch-sunxi/dram.h
---- a/arch/arm/include/asm/arch-sunxi/dram.h	(revision 866ca972d6c3cabeaf6dbac431e8e08bb30b3c8e)
-+++ b/arch/arm/include/asm/arch-sunxi/dram.h	(date 1727663901077)
+--- a/arch/arm/include/asm/arch-sunxi/dram.h
++++ b/arch/arm/include/asm/arch-sunxi/dram.h
 @@ -40,5 +40,6 @@
  unsigned long sunxi_dram_init(void);
  void mctl_await_completion(u32 *reg, u32 mask, u32 val);
@@ -90,11 +75,6 @@ diff --git a/arch/arm/include/asm/arch-sunxi/dram.h b/arch/arm/include/asm/arch-
 +bool mctl_mem_matches_base(u32 offset, ulong base);
 
  #endif /* _SUNXI_DRAM_H */
-Index: board/sunxi/board.c
-IDEA additional info:
-Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
-<+>UTF-8
-===================================================================
 diff --git a/board/sunxi/board.c b/board/sunxi/board.c
 index 8c12c8deade..7a5c447370f 100644
 --- a/board/sunxi/board.c
@@ -125,15 +105,10 @@ index 8c12c8deade..7a5c447370f 100644
  #if CONFIG_IS_ENABLED(DM_I2C)
  	/*
  	 * Temporary workaround for enabling I2C clocks until proper sunxi DM
-Index: configs/dsdz-h618_defconfig
-IDEA additional info:
-Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
-<+>UTF-8
-===================================================================
 diff --git a/configs/dsdz-h618_defconfig b/configs/dsdz-h618_defconfig
 new file mode 100644
---- /dev/null	(date 1727694648503)
-+++ b/configs/dsdz-h618_defconfig	(date 1727694648503)
+--- /dev/null
++++ b/configs/dsdz-h618_defconfig
 @@ -0,0 +1,31 @@
 +CONFIG_ARM=y
 +CONFIG_ARCH_SUNXI=y
@@ -166,14 +141,9 @@ new file mode 100644
 +CONFIG_USB_MUSB_GADGET=y
 +CONFIG_AXP_DCDC2_VOLT=900
 +CONFIG_AXP_DCDC3_VOLT=1100
-Index: arch/arm/mach-sunxi/dram_helpers.c
-IDEA additional info:
-Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
-<+>UTF-8
-===================================================================
 diff --git a/arch/arm/mach-sunxi/dram_helpers.c b/arch/arm/mach-sunxi/dram_helpers.c
---- a/arch/arm/mach-sunxi/dram_helpers.c	(revision 866ca972d6c3cabeaf6dbac431e8e08bb30b3c8e)
-+++ b/arch/arm/mach-sunxi/dram_helpers.c	(date 1727664461172)
+--- a/arch/arm/mach-sunxi/dram_helpers.c
++++ b/arch/arm/mach-sunxi/dram_helpers.c
 @@ -5,11 +5,13 @@
   * (C) Copyright 2015 Hans de Goede <hdegoede@redhat.com>
   */
@@ -235,14 +205,9 @@ diff --git a/arch/arm/mach-sunxi/dram_helpers.c b/arch/arm/mach-sunxi/dram_helpe
 +	return mctl_mem_matches_base(offset, CFG_SYS_SDRAM_BASE);
  }
  #endif
-Index: arch/arm/mach-sunxi/clock_sun50i_h6.c
-IDEA additional info:
-Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
-<+>UTF-8
-===================================================================
 diff --git a/arch/arm/mach-sunxi/clock_sun50i_h6.c b/arch/arm/mach-sunxi/clock_sun50i_h6.c
---- a/arch/arm/mach-sunxi/clock_sun50i_h6.c	(revision 866ca972d6c3cabeaf6dbac431e8e08bb30b3c8e)
-+++ b/arch/arm/mach-sunxi/clock_sun50i_h6.c	(date 1727664090917)
+--- a/arch/arm/mach-sunxi/clock_sun50i_h6.c
++++ b/arch/arm/mach-sunxi/clock_sun50i_h6.c
 @@ -16,6 +16,8 @@
  		/* this seems to enable PLLs on H616 */
  		setbits_le32(&prcm->sys_pwroff_gating, 0x10);
@@ -252,15 +217,10 @@ diff --git a/arch/arm/mach-sunxi/clock_sun50i_h6.c b/arch/arm/mach-sunxi/clock_s
  	}
 
  	if (IS_ENABLED(CONFIG_MACH_SUN50I_H616) ||
-Index: arch/arm/dts/sun50i-h618-dsdz-h618.dts
-IDEA additional info:
-Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
-<+>UTF-8
-===================================================================
 diff --git a/arch/arm/dts/sun50i-h618-dsdz-h618.dts b/arch/arm/dts/sun50i-h618-dsdz-h618.dts
 new file mode 100644
---- /dev/null	(date 1727695733385)
-+++ b/arch/arm/dts/sun50i-h618-dsdz-h618.dts	(date 1727695733385)
+--- /dev/null
++++ b/arch/arm/dts/sun50i-h618-dsdz-h618.dts
 @@ -0,0 +1,136 @@
 +// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 +/*
@@ -398,14 +358,9 @@ new file mode 100644
 +	pinctrl-0 = <&uart0_ph_pins>;
 +	status = "okay";
 +};
-Index: arch/arm/mach-sunxi/dram_sunxi_dw.c
-IDEA additional info:
-Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
-<+>UTF-8
-===================================================================
 diff --git a/arch/arm/mach-sunxi/dram_sunxi_dw.c b/arch/arm/mach-sunxi/dram_sunxi_dw.c
---- a/arch/arm/mach-sunxi/dram_sunxi_dw.c	(revision 866ca972d6c3cabeaf6dbac431e8e08bb30b3c8e)
-+++ b/arch/arm/mach-sunxi/dram_sunxi_dw.c	(date 1727664583869)
+--- a/arch/arm/mach-sunxi/dram_sunxi_dw.c
++++ b/arch/arm/mach-sunxi/dram_sunxi_dw.c
 @@ -652,20 +652,6 @@
  	return 0;
  }

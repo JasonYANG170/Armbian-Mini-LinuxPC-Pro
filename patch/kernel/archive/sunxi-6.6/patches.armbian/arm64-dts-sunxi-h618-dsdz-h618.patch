@@ -1,8 +1,6 @@
-Subject: [PATCH] s
-Index: arch/arm64/boot/dts/allwinner/Makefile
 diff --git a/arch/arm64/boot/dts/allwinner/Makefile b/arch/arm64/boot/dts/allwinner/Makefile
---- a/arch/arm64/boot/dts/allwinner/Makefile	(revision a8679361c3361f638fda18be941b7bc29f29573d)
-+++ b/arch/arm64/boot/dts/allwinner/Makefile	(date 1727774659795)
+--- a/arch/arm64/boot/dts/allwinner/Makefile
++++ b/arch/arm64/boot/dts/allwinner/Makefile
 @@ -40,5 +40,6 @@
  dtb-$(CONFIG_ARCH_SUNXI) += sun50i-h6-tanix-tx6-mini.dtb
  dtb-$(CONFIG_ARCH_SUNXI) += sun50i-h616-orangepi-zero2.dtb
@@ -10,10 +8,9 @@ diff --git a/arch/arm64/boot/dts/allwinner/Makefile b/arch/arm64/boot/dts/allwin
 +dtb-$(CONFIG_ARCH_SUNXI) += sun50i-h618-dsdz-h618.dtb
  dtb-$(CONFIG_ARCH_SUNXI) += sun50i-h616-x96-mate.dtb
  dtb-$(CONFIG_ARCH_SUNXI) += sun50i-h618-orangepi-zero3.dtb
-Index: drivers/net/phy/sunxi-ephy.c
 diff --git a/drivers/net/phy/sunxi-ephy.c b/drivers/net/phy/sunxi-ephy.c
---- a/drivers/net/phy/sunxi-ephy.c	(revision a8679361c3361f638fda18be941b7bc29f29573d)
-+++ b/drivers/net/phy/sunxi-ephy.c	(date 1727774706133)
+--- a/drivers/net/phy/sunxi-ephy.c
++++ b/drivers/net/phy/sunxi-ephy.c
 @@ -267,8 +267,8 @@
 
  	phy_write(priv->ac300, 0x00, 0x1fb7); /* clk gating (24MHz clock)*/
@@ -24,4 +21,3 @@ diff --git a/drivers/net/phy/sunxi-ephy.c b/drivers/net/phy/sunxi-ephy.c
 +//	phy_write(priv->ac300, 0x05, 0xa819);
 
  	phy_write(priv->ac300, 0x06, 0x00);
-
