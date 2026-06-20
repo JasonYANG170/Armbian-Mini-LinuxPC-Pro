@@ -1,6 +1,11 @@
 name: Build Armbian for DSDZ-H618
 
 on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'myfile/**'
+      - '.github/workflows/build-armbian.yml'
   workflow_dispatch:
     inputs:
       armbian_release:
@@ -33,101 +38,79 @@ jobs:
     - name: Install dependencies
       run: |
         sudo apt-get update
-        sudo apt-get install -y wget xz-utils device-tree-compiler
+        sudo apt-get install -y wget xz-utils
 
     - name: Download official Armbian image
       run: |
-        # 获取最新 Armbian H618 镜像 URL
-        # 使用 OrangePi Zero3 的镜像（同为 H618）
-        echo "Downloading Armbian for H618..."
-        
-        # 从 GitHub API 获取最新 release
-        API_URL="https://api.github.com/repos/armbian/build/releases/latest"
-        DOWNLOAD_URL=$(curl -s "$API_URL" | python3 -c "
-        import json, sys
-        data = json.load(sys.stdin)
-        for asset in data.get('assets', []):
-            name = asset['name']
-            if 'orangepi3' in name.lower() or 'zero3' in name.lower():
-                if name.endswith('.img.xz'):
-                    print(asset['browser_download_url'])
-                    break
-        ")
-        
-        if [ -z "$DOWNLOAD_URL" ]; then
-          echo "Trying alternative: download from Armbian CDN..."
-          DOWNLOAD_URL="https://mirrors.tuna.tsinghua.edu.cn/armbian-dl/orangepi3/archive/Armbian_24.2.1_Orangepi3_jammy_current_6.6.16.img.xz"
+        echo "Downloading Armbian for OrangePi Zero3 (H618)..."
+        RELEASE="${{ env.RELEASE }}"
+        MIRROR_BASE="https://mirrors.tuna.tsinghua.edu.cn/armbian-releases/orangepizero3/archive"
+        FILE_LIST=$(curl -sL "$MIRROR_BASE/" | grep -oP 'href="(Armbian_[^"]*\.img\.xz)"' | sed 's/href="//;s/"//')
+        DOWNLOAD_FILE=$(echo "$FILE_LIST" | grep -i "_${RELEASE}_" | grep -i "minimal" | head -1)
+        if [ -z "$DOWNLOAD_FILE" ]; then
+          DOWNLOAD_FILE=$(echo "$FILE_LIST" | grep -i "_${RELEASE}_" | head -1)
         fi
-        
-        echo "Downloading from: $DOWNLOAD_URL"
-        wget -q "$DOWNLOAD_URL" -O armbian-base.img.xz || {
-          echo "Direct download failed, trying Armbian download page..."
-          # 备用：从文件列表下载
-          wget -q "https://github.com/armbian/build/releases/download/v24.2.1/Armbian_24.2.1_Orangepi3_jammy_current_6.6.16.img.xz" -O armbian-base.img.xz
-        }
-        
+        if [ -z "$DOWNLOAD_FILE" ]; then
+          echo "ERROR: No image found for release '${RELEASE}'"
+          echo "$FILE_LIST"
+          exit 1
+        fi
+        DOWNLOAD_URL="${MIRROR_BASE}/${DOWNLOAD_FILE}"
+        echo "Downloading: $DOWNLOAD_URL"
+        wget -q --show-progress "$DOWNLOAD_URL" -O armbian-base.img.xz
         echo "Decompressing..."
         xz -d armbian-base.img.xz
         ls -lh armbian-base.img
 
     - name: Mount and modify image
       run: |
-        # 创建挂载点
-        mkdir -p /tmp/armbian/{boot,root}
-        
-        # 获取 loop 设备
+        set -e
+        mkdir -p /tmp/armbian/boot /tmp/armbian/root
         LOOP=$(sudo losetup -fP --show armbian-base.img)
         echo "Loop device: $LOOP"
-        
-        # 挂载分区
         sudo mount ${LOOP}p1 /tmp/armbian/boot
         sudo mount ${LOOP}p2 /tmp/armbian/root
-        
-        # 复制设备树
-        echo "Adding DSDZ-H618 device tree..."
-        sudo cp build-armbian/armbian-files/platform-files/allwinner/bootfs/dtb/allwinner/sun50i-h618-dsdz-h618.dtb /tmp/armbian/boot/dtb/allwinner/
-        
-        # 修改 armbianEnv.txt
-        sudo tee /tmp/armbian/boot/armbianEnv.txt << 'EOF'
-        verbosity=1
-        bootlogo=false
-        overlay_prefix=sun50i-h616
-        fdtfile=allwinner/sun50i-h618-dsdz-h618.dtb
-        rootdev=UUID=ROOT_UUID
-        rootfstype=ext4
-        rootflags=commit=5,noatime
-        EOF
-        
-        # 获取 rootfs UUID
+        echo "=== Original armbianEnv.txt ==="
+        cat /tmp/armbian/boot/armbianEnv.txt
+        sudo cp /tmp/armbian/boot/armbianEnv.txt /tmp/armbian/boot/armbianEnv.txt.orig
         ROOT_UUID=$(sudo blkid -s UUID -o value ${LOOP}p2)
-        sudo sed -i "s/ROOT_UUID/$ROOT_UUID/" /tmp/armbian/boot/armbianEnv.txt
-        
-        # 添加首次运行脚本
-        sudo cp build-armbian/armbian-files/platform-files/allwinner/rootfs/* /tmp/armbian/root/root/ 2>/dev/null || true
-        
-        # 卸载
+        echo "Root UUID: $ROOT_UUID"
+        printf 'verbosity=1\nbootlogo=false\noverlay_prefix=sun50i-h616\nfdtfile=allwinner/sun50i-h618-dsdz-h618.dtb\nrootdev=UUID=%s\nrootfstype=ext4\nrootflags=commit=5,noatime\n' "$ROOT_UUID" | sudo tee /tmp/armbian/boot/armbianEnv.txt > /dev/null
+        echo "=== New armbianEnv.txt ==="
+        cat /tmp/armbian/boot/armbianEnv.txt
+        DTB_SRC="build-armbian/armbian-files/platform-files/allwinner/bootfs/dtb/allwinner/sun50i-h618-dsdz-h618.dtb"
+        if [ -f "$DTB_SRC" ]; then
+          echo "Adding custom DSDZ-H618 DTB..."
+          sudo cp "$DTB_SRC" /tmp/armbian/boot/dtb/allwinner/
+        else
+          echo "No custom DTB, copying OrangePi Zero3 DTB as DSDZ-H618"
+          sudo cp /tmp/armbian/boot/dtb/allwinner/sun50i-h618-orangepi-zero3.dtb /tmp/armbian/boot/dtb/allwinner/sun50i-h618-dsdz-h618.dtb
+        fi
+        OVERLAY_DIR="myfile/overlay_rootfs"
+        if [ -d "$OVERLAY_DIR" ]; then
+          echo "Applying rootfs overlay from $OVERLAY_DIR ..."
+          sudo cp -rT "$OVERLAY_DIR" /tmp/armbian/root/
+          echo "Overlay applied"
+        else
+          echo "WARNING: No overlay directory at $OVERLAY_DIR"
+        fi
         sudo umount /tmp/armbian/boot
         sudo umount /tmp/armbian/root
         sudo losetup -d $LOOP
-        
         echo "Image modified successfully"
 
     - name: Compress and publish
       run: |
-        # 压缩镜像
-        xz -z armbian-base.img
-        
-        # 重命名
+        xz -z -T0 armbian-base.img
         DATE=$(date +%Y%m%d)
         mv armbian-base.img.xz "Armbian-DSDZ-H618-${RELEASE}-${DATE}.img.xz"
-        
         ls -lh *.img.xz
 
     - name: Upload firmware
       uses: actions/upload-artifact@v4
       with:
         name: Armbian-DSDZ-H618-${{ env.RELEASE }}
-        path: "*.img.xz"
+        path: "Armbian-DSDZ-H618-*.img.xz"
         retention-days: 30
 
     - name: Create release
@@ -138,5 +121,5 @@ jobs:
       with:
         tag_name: armbian-${{ env.RELEASE }}-${{ github.run_number }}
         name: "Armbian DSDZ-H618 ${{ env.RELEASE }}"
-        files: "*.img.xz"
+        files: "Armbian-DSDZ-H618-*.img.xz"
         generate_release_notes: true
