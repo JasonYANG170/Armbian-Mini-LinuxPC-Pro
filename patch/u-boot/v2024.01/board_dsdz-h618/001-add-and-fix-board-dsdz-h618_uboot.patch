@@ -1,8 +1,8 @@
-Index: drivers/mmc/sunxi_mmc.c
-IDEA additional info:
-Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
-<+>UTF-8
-===================================================================
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: JasonYANG170 <jasonyang170@example.com>
+Date: Mon, 1 Jan 2024 00:00:00 +0800
+Subject: [PATCH] Add DSDZ-H618 board support
+
 diff --git a/drivers/mmc/sunxi_mmc.c b/drivers/mmc/sunxi_mmc.c
 --- a/drivers/mmc/sunxi_mmc.c	(revision 866ca972d6c3cabeaf6dbac431e8e08bb30b3c8e)
 +++ b/drivers/mmc/sunxi_mmc.c	(date 1727666286495)

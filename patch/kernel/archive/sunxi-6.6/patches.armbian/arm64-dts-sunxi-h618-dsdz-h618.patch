@@ -1,5 +1,12 @@
-Subject: [PATCH] s
-Index: arch/arm64/boot/dts/allwinner/Makefile
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: JasonYANG170 <jasonyang170@example.com>
+Date: Mon, 1 Jan 2024 00:00:00 +0800
+Subject: [PATCH] arm64: dts: sunxi: Add DSDZ-H618 board support
+
+Add device tree for DSDZ-H618 board.
+
+Signed-off-by: JasonYANG170 <jasonyang170@example.com>
+---
 diff --git a/arch/arm64/boot/dts/allwinner/Makefile b/arch/arm64/boot/dts/allwinner/Makefile
 --- a/arch/arm64/boot/dts/allwinner/Makefile	(revision a8679361c3361f638fda18be941b7bc29f29573d)
 +++ b/arch/arm64/boot/dts/allwinner/Makefile	(date 1727774659795)
