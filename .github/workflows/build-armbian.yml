@@ -73,6 +73,11 @@ jobs:
       if: env.BUILD_TYPE == 'desktop'
       run: |
         chmod +x compile.sh
+        # KDE/Cinnamon/Mate 需要 EXPERT=yes
+        EXPERT_FLAG=""
+        if [[ "${{ env.DESKTOP_ENV }}" =~ ^(kde-plasma|cinnamon|mate)$ ]]; then
+          EXPERT_FLAG="EXPERT=yes"
+        fi
         ./compile.sh build BOARD=dsdz-h618 BRANCH=current \
           BUILD_DESKTOP=yes \
           BUILD_MINIMAL=no \
@@ -80,7 +85,8 @@ jobs:
           DESKTOP_ENVIRONMENT=${{ env.DESKTOP_ENV }} \
           DESKTOP_ENVIRONMENT_CONFIG_NAME=config_base \
           KERNEL_CONFIGURE=no \
-          RELEASE=jammy
+          RELEASE=jammy \
+          $EXPERT_FLAG
 
     - name: Upload firmware
       uses: actions/upload-artifact@v4
