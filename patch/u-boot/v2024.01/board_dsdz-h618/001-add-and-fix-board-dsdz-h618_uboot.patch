@@ -20,6 +20,7 @@ diff --git a/arch/arm/dts/Makefile b/arch/arm/dts/Makefile
 +	sun50i-h618-dsdz-h618.dtb
  dtb-$(CONFIG_MACH_SUN50I) += \
  	sun50i-a64-amarula-relic.dtb \
+ 	sun50i-a64-bananapi-m64.dtb \
 diff --git a/configs/dsdz-h618_defconfig b/configs/dsdz-h618_defconfig
 new file mode 100644
 --- /dev/null
