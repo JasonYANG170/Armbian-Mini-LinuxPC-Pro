@@ -66,8 +66,9 @@ jobs:
 
         cd "$GITHUB_WORKSPACE"
 
-        # 用 cpp 预处理 DTS
+        # 用 cpp 预处理 DTS（定义 Allwinner pin bank 宏）
         cpp -nostdinc -I/tmp/dtb-build/include -undef -x assembler-with-cpp \
+          -DPA=0 -DPB=1 -DPC=2 -DPD=3 -DPE=4 -DPF=5 -DPG=6 -DPH=7 -DPI=8 \
           myfile/sun50i-h618-dsdz-h618.dts \
           /tmp/dtb-build/sun50i-h618-dsdz-h618.preprocessed.dts
 
