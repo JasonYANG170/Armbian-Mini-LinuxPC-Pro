@@ -11,15 +11,14 @@ on:
       armbian_release:
         description: 'Armbian Release'
         required: false
-        default: 'jammy'
+        default: 'noble'
         type: choice
         options:
-          - jammy
           - noble
           - bookworm
 
 env:
-  RELEASE: ${{ github.event.inputs.armbian_release || 'jammy' }}
+  RELEASE: ${{ github.event.inputs.armbian_release || 'noble' }}
 
 jobs:
   build:
@@ -52,6 +51,7 @@ jobs:
         fi
         if [ -z "$DOWNLOAD_FILE" ]; then
           echo "ERROR: No image found for release '${RELEASE}'"
+          echo "Available:"
           echo "$FILE_LIST"
           exit 1
         fi
