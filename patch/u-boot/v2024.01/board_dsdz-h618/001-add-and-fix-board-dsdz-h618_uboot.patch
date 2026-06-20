@@ -5,9 +5,8 @@ Subject: Add DSDZ-H618 board support
 
 ---
  arch/arm/dts/Makefile               |   1 +
- arch/arm/dts/sun50i-h618-dsdz-h618.dts | 136 +++++++++++++++++++++++
  configs/dsdz-h618_defconfig          |  31 ++++++
- 3 files changed, 168 insertions(+)
+ 2 files changed, 32 insertions(+)
 
 diff --git a/arch/arm/dts/Makefile b/arch/arm/dts/Makefile
 --- a/arch/arm/dts/Makefile
@@ -21,6 +20,7 @@ diff --git a/arch/arm/dts/Makefile b/arch/arm/dts/Makefile
  dtb-$(CONFIG_MACH_SUN50I) += \
  	sun50i-a64-amarula-relic.dtb \
  	sun50i-a64-bananapi-m64.dtb \
+
 diff --git a/configs/dsdz-h618_defconfig b/configs/dsdz-h618_defconfig
 new file mode 100644
 --- /dev/null
