@@ -2,6 +2,14 @@
 
 基于官方 Armbian 镜像重新打包，支持 DSDZ-H618 开发板（Allwinner H618）。
 
+## 适配硬件
+
+![Mini-LinuxPC-Pro H618 掌上电脑实物](docs/images/project-hardware.webp)
+
+图片展示适配设备的实物，屏幕内容来自硬件项目展示。
+
+[硬件项目与图片来源](https://oshwhub.com/jasonyang17/mini-linuxpc-pro)
+
 ## 硬件信息
 
 - **SoC**: Allwinner H618 (ARM Cortex-A53, 四核)
