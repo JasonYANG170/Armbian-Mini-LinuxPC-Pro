@@ -2,59 +2,59 @@
 
 # Armbian Mini LinuxPC Pro - DSDZ-H618
 
-基于官方 Armbian 镜像重新打包，支持 DSDZ-H618 开发板（Allwinner H618）。
+Repackaged based on the official Armbian image and supports DSDZ-H618 development board (Allwinner H618).
 
-## 适配硬件
+## Supported hardware
 
-![Mini-LinuxPC-Pro H618 掌上电脑实物](docs/images/project-hardware.webp)
+![Mini-LinuxPC-Pro H618 handheld computer](docs/images/project-hardware.webp)
 
-图片展示适配设备的实物，屏幕内容来自硬件项目展示。
+The image shows the supported hardware; the screen contents come from the hardware project's demonstration.
 
-[硬件项目与图片来源](https://oshwhub.com/jasonyang17/mini-linuxpc-pro)
+[Hardware project and image source](https://oshwhub.com/jasonyang17/mini-linuxpc-pro)
 
-## 硬件信息
+## Hardware information
 
-- **SoC**: Allwinner H618 (ARM Cortex-A53, 四核)
+- **SoC**: Allwinner H618 (ARM Cortex-A53, quad-core)
 - **RAM**: 1GB/2GB LPDDR4
-- **存储**: 128GB eMMC
-- **网络**: 1GbE (RTL8221B)
-- **显示**: ST7789V SPI LCD (170x320)
+- **Storage**: 128GB eMMC
+- **Network**: 1GbE (RTL8221B)
+- **Display**: ST7789V SPI LCD (170x320)
 
-## 快速使用
+## Quick start
 
-### 下载固件
+### Download firmware
 
-从 [Releases](https://github.com/JasonYANG170/Armbian-Mini-LinuxPC-Pro/releases) 页面下载最新固件。
+Download the latest firmware from the [Releases](https://github.com/JasonYANG170/Armbian-Mini-LinuxPC-Pro/releases) page.
 
-### 刷机
+### Flash
 
-1. 使用 Rufus 或 balenaEtcher 将固件写入 TF 卡
-2. 插入 TF 卡到开发板
-3. 连接串口或 SSH（默认 IP 从路由器获取）
-4. 默认用户：root，密码：1234
+1. Use Rufus or balenaEtcher to write the firmware to the TF card
+2. Insert the TF card into the development board
+3. Connect to the serial port or SSH (the default IP is obtained from the router)
+4. Default user: root, password: 1234
 
-### 安装到 eMMC
+### Install to eMMC
 
 ```bash
 armbian-install
 ```
 
-## 构建方式
+## Build method
 
-本项目使用 **镜像重打包** 方式，不从源码编译：
+This project uses the **image repackaging** method and does not compile from source code:
 
 ```
 官方 Armbian 镜像 → 下载 → 替换设备树/配置 → 重新打包 → 发布
 ```
 
-### GitHub Actions 自动构建
+### GitHub Actions automated builds
 
-1. Fork 本仓库
-2. 进入 Actions 页面
-3. 选择 "Build Armbian for DSDZ-H618"
-4. 点击 "Run workflow"
+1. Fork this repository
+2. Enter the Actions page
+3. Select "Build Armbian for DSDZ-H618"
+4. Click "Run workflow"
 
-### 本地构建
+### Local build
 
 ```bash
 # 安装依赖
@@ -94,7 +94,7 @@ sudo losetup -d /dev/loop0
 xz -z *.img
 ```
 
-## 目录结构
+## Directory structure
 
 ```
 Armbian-Mini-LinuxPC-Pro/
@@ -110,6 +110,6 @@ Armbian-Mini-LinuxPC-Pro/
     └── sun50i-h616.dtsi
 ```
 
-## 许可证
+## License
 
-基于 [Armbian](https://github.com/armbian/build) 开源项目。
+Based on [Armbian](https://github.com/armbian/build) open source project.
